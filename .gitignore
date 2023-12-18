@@ -1,0 +1,18 @@
+# cache
+__pycache__/
+
+# build files
+*.egg-info/
+build/
+
+# vagrant vm
+replication/singularity_files/.vagrant/
+
+# MacOS files
+.DS_Store
+
+# Pycharm
+.idea/
+
+# Pyre
+.pyre/

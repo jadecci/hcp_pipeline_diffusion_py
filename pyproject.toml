@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hcpdiffpy"
+authors = [
+    {name = "Jianxiao Wu", email = "j.wu@fz-juelich.de"}
+]
+description = "A Python implementation of HCP Pipeline for diffusion preprocessing"
+readme = {file = "README.md", content-type = "text/markdown"}
+requires-python = ">=3.9"
+keywords = ["neuroimaging", "diffusion", "preprocessing", "hcp"]
+license = {file = "LICENSE"}
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Topic :: Neuroimaging :: Preprcessing",
+]
+dependencies = [
+    "pandas ~= 1.3.5",
+    "nipype ~= 1.8.5",
+    "numpy ~= 1.21.6",
+    "datalad ~= 0.17.7",
+    "nibabel ~= 4.0.2",
+]
+dynamic = ["version"]
+
+[project.scripts]
+hcpdiffpy = "hcpdiffpy.main:main"
+
+[project.urls]
+repository = "https://github.com/jadecci/hcp_pipeline_diffusion_py"
+repository-gin = "https://gin.g-node.org/jadecci/hcp_pipeline_diffusion_py"
+
+[tool.setuptools]
+packages = ["hcpdiffpy"]
+
+[tool.setuptools.dynamic]
+version = {attr = "hcpdiffpy.VERSION"}
