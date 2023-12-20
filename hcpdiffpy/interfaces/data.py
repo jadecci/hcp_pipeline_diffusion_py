@@ -32,9 +32,10 @@ class InitData(SimpleInterface):
         anat_dir = Path(sub_dir, "T1w")
         fs_dir = Path(anat_dir, self.inputs.config["subject"])
         if dataset_dir is not None:
-            for dir in sub_dir, d_dir.parent, anat_dir:
+            for dir_curr in sub_dir, d_dir.parent, anat_dir:
                 dl.get(
-                    path=dir, dataset=dataset_dir, get_data=False, source=source, on_failure='stop')
+                    path=dir_curr, dataset=dataset_dir, get_data=False, source=source,
+                    on_failure='stop')
 
         d_files = {}
         for ndir in self.inputs.config["ndirs"]:

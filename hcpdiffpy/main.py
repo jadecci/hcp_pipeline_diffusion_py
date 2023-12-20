@@ -148,12 +148,12 @@ def main() -> None:
         fsl.ApplyTOPUP(command=fsl_cmd.cmd("applytopup"), method="jac"), "apply_topup")
     nodiff_mask = pe.Node(fsl.BET(command=fsl_cmd.cmd("bet"), frac=0.2, mask=True), "nodiff_mask")
 
-    hcpdiff_wf.config([
+    hcpdiff_wf.connect([
         (update_d_files, prepare_topup, [("d_files", "d_files")]),
         (b0_list, prepare_topup, [("output", "roi_files")]),
         (merge_pos_b0s, prepare_topup, [("merged_file", "pos_b0_file")]),
         (merge_rescaled_b0s, topup, [("merged_file", "in_file")]),
-        (prepare_topup, topup, [("enc_dir", "encoding_direction"), ("ro_time", "readout_time")]),
+        (prepare_topup, topup, [("enc_dir", "encoding_direction"), ("ro_time", "readout_times")]),
         (merge_pos_b0s, pos_b01, [("merged_file", "in_file")]),
         (merge_neg_b0s, neg_b01, [("merged_file", "in_file")]),
         (pos_b01, b01_files, [("roi_file", "input1")]),
@@ -180,7 +180,7 @@ def main() -> None:
         (b0_list, eddy_index, [("output", "roi_files")]),
         (d_filetype, eddy_index, [("data_files", "dwi_files")]),
         (merge_dwi, eddy, [("merged_file", "in_file")]),
-        (merge_bfiles, eddy, [("bval_nerged", "in_bval"), ("bvec_merged", "in_bvec")]),
+        (merge_bfiles, eddy, [("bval_merged", "in_bval"), ("bvec_merged", "in_bvec")]),
         (topup, eddy, [("out_enc_file", "in_acqp")]),
         (eddy_index, eddy, [("index_file", "in_index")]),
         (nodiff_mask, eddy, [("mask_file", "in_mask")]),
@@ -230,12 +230,12 @@ def main() -> None:
         (thr_data, nodiff_brain, [("out_file", "in_file")]),
         (init_data, t1_files, [("t1_files", "t1_files")]),
         (t1_files, wm_seg, [("t1_brain_file", "in_files")]),
-        (wm_seg, pve_file, [("partial_volume_files", "in_list")]),
+        (wm_seg, pve_file, [("partial_volume_files", "input")]),
         (pve_file, wm_thr, [("output", "in_file")]),
         (nodiff_brain, flirt_init, [("roi_file", "in_file")]),
         (t1_files, flirt_init, [("t1_brain_file", "reference")]),
         (nodiff_brain, flirt_nodiff2t1, [("roi_file", "in_file")]),
-        (t1_files, flirt_nodiff2t1, [("t1", "reference")]),
+        (t1_files, flirt_nodiff2t1, [("t1_file", "reference")]),
         (wm_thr, flirt_nodiff2t1, [("out_file", "wm_seg")]),
         (flirt_init, flirt_nodiff2t1, [("out_matrix_file", "in_matrix_file")]),
         (nodiff_brain, nodiff2t1, [("roi_file", "in_file")]),
