@@ -3,7 +3,6 @@ from shutil import copyfile
 import logging
 
 from nipype.interfaces.base import BaseInterfaceInputSpec, TraitedSpec, SimpleInterface, traits
-import datalad.api as dl
 
 logging.getLogger('datalad').setLevel(logging.WARNING)
 
