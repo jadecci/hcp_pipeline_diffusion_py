@@ -12,7 +12,7 @@ versions, the absolute path to the Singularity images can be passed with the `--
 
 ## Usage
 
-```bash
+```console
 hcpdiffpy --help
 
 usage: hcpdiffpy [-h] [--workdir WORK_DIR] [--output_dir OUTPUT_DIR] [--fsl_simg FSL_SIMG]
