@@ -80,50 +80,6 @@ class SplitDiffFiles(SimpleInterface):
         return runtime
 
 
-class _SplitT1FilesInputSpec(BaseInterfaceInputSpec):
-    t1_files = traits.Dict(mandatory=True, desc="Collection of T1 files")
-
-
-class _SplitT1FilesOutputSpec(TraitedSpec):
-    t1_file = traits.File(exists=True, desc="T1 file")
-    t1_restore_file = traits.File(exists=True, desc="T1 restored file")
-    t1_brain_file = traits.File(exists=True, desc="T1 brain restored file")
-    bias_file = traits.File(exists=True, desc="Bias file")
-    mask_file = traits.File(exists=True, desc="FreeSurfer mask file")
-
-
-class SplitT1Files(SimpleInterface):
-    """Split T1 files collection by file types"""
-    input_spec = _SplitT1FilesInputSpec
-    output_spec = _SplitT1FilesOutputSpec
-
-    def _run_interface(self, runtime):
-        self._results["t1_file"] = self.inputs.t1_files["t1"]
-        self._results["t1_restore_file"] = self.inputs.t1_files["t1_restore"]
-        self._results["t1_brain_file"] = self.inputs.t1_files["t1_restore_brain"]
-        self._results["bias_file"] = self.inputs.t1_files["bias"]
-        self._results["mask_file"] = self.inputs.t1_files["fs_mask"]
-        return runtime
-
-
-class FSEyeInputSpec(BaseInterfaceInputSpec):
-    fs_files = traits.Dict(mandatory=True, desc="Collection of FreeSurfer files")
-
-
-class FSEyeOutputSpec(TraitedSpec):
-    eye_file = traits.File(exists=True, desc="FreeSurfer eye file")
-
-
-class FSEye(SimpleInterface):
-    """Get the eye file from FreeSurfer files collection"""
-    input_spec = FSEyeInputSpec
-    output_spec = FSEyeOutputSpec
-
-    def _run_interface(self, runtime):
-        self._results["eye_file"] = self.inputs.fs_files["eye"]
-        return runtime
-
-
 class _FLIRTSchInputSpec(BaseInterfaceInputSpec):
     in_file = traits.File(mandatory=True, exists=True, desc="Input file")
     reference = traits.File(mandatory=True, exists=True, desc="Reference file")

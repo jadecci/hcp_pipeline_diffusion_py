@@ -13,7 +13,7 @@ from hcpdiffpy.interfaces.preproc import (
     PrepareTopup, WBDilate)
 from hcpdiffpy.interfaces.utilities import (
     CreateList, CombineStrings, DiffRes, FlattenList, Flirtsch, ListItem, PickDiffFiles,
-    SplitDiffFiles, FSEye, SplitT1Files, UpdateDiffFiles)
+    SplitDiffFiles, UpdateDiffFiles)
 
 base_dir = Path(__file__).resolve().parent.parent
 
@@ -29,12 +29,6 @@ def main() -> None:
     parser.add_argument("ndirs", nargs="+", help="List of numbers of directions")
     parser.add_argument("phases", nargs="+", help="List of 2 phase encoding directions")
     parser.add_argument("echo_spacing", type=float, help="Echo spacing used for acquisition in ms")
-    parser.add_argument(
-        "--dataset_dir", type=Path, dest="dataset_dir", default=None,
-        help="Absolute path to the Datalad dataset directory")
-    parser.add_argument(
-        "--source", type=str, dest="source", default=None,
-        help="Source to use for Datalad get command")
     parser.add_argument(
         "--workdir", type=Path, dest="work_dir", default=Path.cwd(),
         help="Absolute path to work directory")
@@ -210,7 +204,6 @@ def main() -> None:
     # 3.2.1. nodiff-to-T1
     nodiff_brain = pe.Node(
         fsl.ExtractROI(command=fsl_cmd.cmd("fslroi"), t_min=0, t_size=1), "nodiff_brain")
-    t1_files = pe.Node(SplitT1Files(), "t1_files")
     wm_seg = pe.Node(fsl.FAST(command=fsl_cmd.cmd("fast"), output_type="NIFTI_GZ"), "wm_seg")
     pve_file = pe.Node(ListItem(index=-1), "pve_file")
     wm_thr = pe.Node(
@@ -228,25 +221,23 @@ def main() -> None:
 
     hcpdiff_wf.connect([
         (thr_data, nodiff_brain, [("out_file", "in_file")]),
-        (init_data, t1_files, [("t1_files", "t1_files")]),
-        (t1_files, wm_seg, [("t1_brain_file", "in_files")]),
+        (init_data, wm_seg, [("t1_brain_file", "in_files")]),
         (wm_seg, pve_file, [("partial_volume_files", "input")]),
         (pve_file, wm_thr, [("output", "in_file")]),
         (nodiff_brain, flirt_init, [("roi_file", "in_file")]),
-        (t1_files, flirt_init, [("t1_brain_file", "reference")]),
+        (init_data, flirt_init, [("t1_brain_file", "reference")]),
         (nodiff_brain, flirt_nodiff2t1, [("roi_file", "in_file")]),
-        (t1_files, flirt_nodiff2t1, [("t1_file", "reference")]),
+        (init_data, flirt_nodiff2t1, [("t1_file", "reference")]),
         (wm_thr, flirt_nodiff2t1, [("out_file", "wm_seg")]),
         (flirt_init, flirt_nodiff2t1, [("out_matrix_file", "in_matrix_file")]),
         (nodiff_brain, nodiff2t1, [("roi_file", "in_file")]),
-        (t1_files, nodiff2t1, [("t1_file", "ref_file")]),
+        (init_data, nodiff2t1, [("t1_file", "ref_file")]),
         (flirt_nodiff2t1, nodiff2t1, [("out_matrix_file", "premat")]),
-        (t1_files, bias_args, [("bias_file", "input2")]),
+        (init_data, bias_args, [("bias_file", "input2")]),
         (nodiff2t1, nodiff_bias, [("out_file", "in_file")]),
         (bias_args, nodiff_bias, [("output", "args")])])
 
     # 3.2.2. diff-to-struct
-    fs_eye = pe.Node(FSEye(), "fs_eye")
     bbr_epi2t1 = pe.Node(
         freesurfer.BBRegister(
             command=fs_cmd.cmd("bbregister", options=f"--env SUBJECTS_DIR={fs_dir}"),
@@ -259,12 +250,11 @@ def main() -> None:
         fsl.ConvertXFM(command=fsl_cmd.cmd("convert_xfm"), concat_xfm=True), "diff2str")
 
     hcpdiff_wf.connect([
-        (init_data, fs_eye, [("fs_files", "fs_files")]),
         (nodiff_bias, bbr_epi2t1, [("out_file", "source_file")]),
-        (fs_eye, bbr_epi2t1, [("eye_file", "init_reg_file")]),
+        (init_data, bbr_epi2t1, [("eye_file", "init_reg_file")]),
         (nodiff_bias, tkr_diff2str, [("out_file", "moving_image")]),
         (bbr_epi2t1, tkr_diff2str, [("out_reg_file", "reg_file")]),
-        (t1_files, tkr_diff2str, [("t1_file", "target_image")]),
+        (init_data, tkr_diff2str, [("t1_file", "target_image")]),
         (flirt_nodiff2t1, diff2str, [("out_matrix_file", "in_file")]),
         (tkr_diff2str, diff2str, [("fsl_file", "in_file2")])])
 
@@ -283,17 +273,17 @@ def main() -> None:
 
     hcpdiff_wf.connect([
         (thr_data, res_dil, [("out_file", "data_file")]),
-        (t1_files, flirt_resamp, [
+        (init_data, flirt_resamp, [
             ("t1_restore_file", "in_file"), ("t1_resotre_file", "reference")]),
         (res_dil, flirt_resamp, [("res", "apply_isoxfm")]),
-        (t1_files, t1_resamp, [("t1_restore_file", "in_file")]),
+        (init_data, t1_resamp, [("t1_restore_file", "in_file")]),
         (flirt_resamp, t1_resamp, [("out_file", "ref_file")]),
         (thr_data, dilate_data, [("out_file", "data_file")]),
         (res_dil, dilate_data, [("dilate", "dilate")]),
         (dilate_data, resamp_data, [("out_file", "in_file")]),
         (t1_resamp, resamp_data, [("out_file", "reference")]),
         (diff2str, resamp_data, [("out_file", "in_matrix_file")]),
-        (t1_files, resamp_mask, [("mask_file", "in_file"), ("mask_file", "reference")]),
+        (init_data, resamp_mask, [("mask_file", "in_file"), ("mask_file", "reference")]),
         (res_dil, resamp_mask, [("res", "apply_isoxfm")]),
         (fov_mask, resamp_fmask, [("out_file", "in_file")]),
         (t1_resamp, resamp_fmask, [("out_file", "reference")]),

@@ -14,8 +14,12 @@ class _InitDataInputSpec(BaseInterfaceInputSpec):
 
 class _InitDataOutputSpec(TraitedSpec):
     d_files = traits.Dict(dtype=Path, desc='filenames of diffusion data')
-    t1_files = traits.Dict(dtype=Path, desc='filenames of T1w data')
-    fs_files = traits.Dict(dtype=Path, desc='filenames of FreeSurfer outputs')
+    t1_file = traits.File(exists=True, desc="T1 file")
+    t1_restore_file = traits.File(exists=True, desc="T1 restored file")
+    t1_brain_file = traits.File(exists=True, desc="T1 brain restored file")
+    bias_file = traits.File(exists=True, desc="Bias file")
+    mask_file = traits.File(exists=True, desc="FreeSurfer mask file")
+    eye_file = traits.File(exists=True, desc="FreeSurfer eye file")
 
 
 class InitData(SimpleInterface):
@@ -25,48 +29,23 @@ class InitData(SimpleInterface):
 
     def _run_interface(self, runtime):
         sub_dir = self.inputs.config["subject_dir"]
-        dataset_dir = self.inputs.config["dataset_dir"]
-        source = self.inputs.config["source"]
-
         d_dir = Path(sub_dir, "unprocessed", "Diffusion")
-        anat_dir = Path(sub_dir, "T1w")
-        fs_dir = Path(anat_dir, self.inputs.config["subject"])
-        if dataset_dir is not None:
-            for dir_curr in sub_dir, d_dir.parent, anat_dir:
-                dl.get(
-                    path=dir_curr, dataset=dataset_dir, get_data=False, source=source,
-                    on_failure='stop')
-
-        d_files = {}
+        self._results["d_files"] = {}
         for ndir in self.inputs.config["ndirs"]:
             for phase in self.inputs.config["phases"]:
                 for file_type in [".nii.gz", ".bval", ".bvec"]:
                     key = f"dir{ndir}_{phase}{file_type}"
-                    d_files[key] = Path(d_dir, f"{self.inputs.subject}_dMRI_{key}")
-        self._results["d_files"] = d_files.copy()
-        if dataset_dir is not None:
-            for key, val in d_files.items():
-                dl.get(path=val, dataset=d_dir.parent, source=source, on_failure='stop')
+                    self._results["d_files"][key] = Path(d_dir, f"{self.inputs.subject}_dMRI_{key}")
 
-        fs_files = {
-            'lh_white_deformed': Path(fs_dir, 'surf', 'lh.white.deformed'),
-            'rh_white_deformed': Path(fs_dir, 'surf', 'rh.white.deformed'),
-            'eye': Path(fs_dir, 'mri', 'transforms', 'eye.dat')}
-        self._results['fs_files'] = fs_files.copy()
-        if dataset_dir is not None:
-            for key, val in fs_files.items():
-                dl.get(path=val, dataset=anat_dir, source=source, on_failure='stop')
+        anat_dir = Path(sub_dir, "T1w")
+        self._results["t1_file"] = Path(anat_dir, 'T1w_acpc_dc.nii.gz')
+        self._results["t1_restore_file"] = Path(anat_dir, 'T1w_acpc_dc_restore.nii.gz')
+        self._results["t1_restore_brain"] = Path(anat_dir, 'T1w_acpc_dc_restore_brain.nii.gz')
+        self._results["bias_file"] = Path(anat_dir, 'BiasField_acpc_dc.nii.gz')
+        self._results["mask_file"] = Path(anat_dir, 'brainmask_fs.nii.gz')
 
-        t1_files = {
-            't1': Path(anat_dir, 'T1w_acpc_dc.nii.gz'),
-            't1_restore': Path(anat_dir, 'T1w_acpc_dc_restore.nii.gz'),
-            't1_restore_brain': Path(anat_dir, 'T1w_acpc_dc_restore_brain.nii.gz'),
-            'bias': Path(anat_dir, 'BiasField_acpc_dc.nii.gz'),
-            'fs_mask': Path(anat_dir, 'brainmask_fs.nii.gz')}
-        self._results['t1_files'] = t1_files.copy()
-        if dataset_dir is not None:
-            for key, val in t1_files.items():
-                dl.get(path=val, dataset=anat_dir, source=source, on_failure='stop')
+        fs_dir = Path(anat_dir, self.inputs.config["subject"])
+        self._results["eye_file"] = Path(fs_dir, 'mri', 'transforms', 'eye.dat')
 
         return runtime
 
