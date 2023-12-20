@@ -3,7 +3,6 @@ from pathlib import Path
 import argparse
 
 from nipype.interfaces import fsl, freesurfer
-import datalad.api as dl
 import nipype.pipeline as pe
 
 from hcpdiffpy.container import SimgCmd
@@ -12,10 +11,10 @@ from hcpdiffpy.interfaces.preproc import (
     EddyIndex, EddyPostProc, ExtractB0, DilateMask, MergeBFiles, Rescale, RotateBVec2Str,
     PrepareTopup, WBDilate)
 from hcpdiffpy.interfaces.utilities import (
-    CreateList, CombineStrings, DiffRes, FlattenList, Flirtsch, ListItem, PickDiffFiles,
-    SplitDiffFiles, UpdateDiffFiles)
+    CreateList, CombineStrings, DiffRes, FlattenList, ListItem, PickDiffFiles, SplitDiffFiles,
+    UpdateDiffFiles)
 
-base_dir = Path(__file__).resolve().parent.parent
+base_dir = Path(__file__).resolve().parent
 
 
 def main() -> None:
@@ -59,15 +58,8 @@ def main() -> None:
     fsl_cmd = SimgCmd(config, config["fsl_simg"])
     fs_cmd = SimgCmd(config, config["fs_simg"])
     wb_cmd = SimgCmd(config, config["wb_simg"])
-    topup_config = Path(config["tmp_dir"], "HCP_pipeline", "global", "config", "b02b0.cnf")
-    if not topup_config.is_file():
-        dl.clone(
-            "git@github.com:Washington-University/HCPpipelines.git",
-            path=Path(config["tmp_dir"], "HCP_pipeline"))
-    if config["fsl_simg"] is None:
-        sch_file = Path(getenv("FSLDIR"), "etc", "flirtsch", "bbr.sch")
-    else: # guess path in container
-        sch_file = "/usr/local/fsl/etc/flirtsch/bbr.sch"
+    topup_config = Path(base_dir, "utilities", "b02b0.cnf")
+    sch_file = Path(base_dir, "utilities", "bbr.sch")
     fs_dir = Path(config["subject_dir"], "T1w", config["subject"])
 
     # Workflow set-up
@@ -210,9 +202,7 @@ def main() -> None:
         fsl.ImageMaths(command=fsl_cmd.cmd("fslmaths"), args="-thr 0.5 -bin"), "wm_thr")
     flirt_init = pe.Node(fsl.FLIRT(command=fsl_cmd.cmd("flirt"), dof=6), "flirt_init")
     flirt_nodiff2t1 = pe.Node(
-        Flirtsch(
-            fsl_cmd=fsl_cmd, schedule=sch_file, out_matrix_file=Path(
-                config["tmp_dir"], "flirt_sch_nodiff2t1.mat")),
+        fsl.FLIRT(command=fsl_cmd.cmd("flirt"), dof=6, cost="bbr", schedule=sch_file),
         "flirt_nodiff2t1")
     nodiff2t1 = pe.Node(
         fsl.ApplyWarp(command=fsl_cmd.cmd("applywarp"), interp="spline", relwarp=True), "nodiff2t1")
@@ -274,7 +264,7 @@ def main() -> None:
     hcpdiff_wf.connect([
         (thr_data, res_dil, [("out_file", "data_file")]),
         (init_data, flirt_resamp, [
-            ("t1_restore_file", "in_file"), ("t1_resotre_file", "reference")]),
+            ("t1_restore_file", "in_file"), ("t1_restore_file", "reference")]),
         (res_dil, flirt_resamp, [("res", "apply_isoxfm")]),
         (init_data, t1_resamp, [("t1_restore_file", "in_file")]),
         (flirt_resamp, t1_resamp, [("out_file", "ref_file")]),
@@ -335,7 +325,7 @@ def main() -> None:
             plugin="CondorDAGMan",
             plugin_args={
                 "dagman_args": f"-outfile_dir {config['work_dir']} -import_env",
-                "wrapper_cmd": Path(base_dir, "hcpdiffpy", "venv_wrapper.sh"),
+                "wrapper_cmd": Path(base_dir, "utilities", "venv_wrapper.sh"),
                 "override_specs": "request_memory = 5 GB\nrequest_cpus = 1"})
     else:
         hcpdiff_wf.run()

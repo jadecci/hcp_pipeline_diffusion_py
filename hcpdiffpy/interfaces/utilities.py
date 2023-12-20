@@ -80,37 +80,6 @@ class SplitDiffFiles(SimpleInterface):
         return runtime
 
 
-class _FLIRTSchInputSpec(BaseInterfaceInputSpec):
-    in_file = traits.File(mandatory=True, exists=True, desc="Input file")
-    reference = traits.File(mandatory=True, exists=True, desc="Reference file")
-    wm_seg = traits.File(exists=True, desc="White matter segmentation volume")
-    in_matrix_file = traits.File(exists=True, desc="Input affine matrix")
-    schedule = traits.File(desc="Replaces default schedule")
-    out_matrix_file = traits.File(desc="Output affine matrix")
-    fsl_cmd = traits.Any(mandatory=True, desc="command for using singularity image (or not)")
-
-
-class _FLIRTSchOutputSpec(TraitedSpec):
-    out_matrix_file = traits.File(exists=True, desc="Output affine matrix")
-
-
-class Flirtsch(SimpleInterface):
-    """Run FLIRT with non-default schedule file which may exist in a container"""
-    input_spec = _FLIRTSchInputSpec
-    output_spec = _FLIRTSchOutputSpec
-
-    def _run_interface(self, runtime):
-        subprocess.run(
-            self.inputs.fsl_cmd.cmd("flirt").split() + [
-                "-in", self.inputs.in_file, "-ref", self.inputs.reference,
-                "-wmseg", self.inputs.wm_seg, "-init", self.inputs.in_matrix_file,
-                "-omat", self.inputs.out_matrix_file, "-dof", "6", "-cost", "bbr",
-                "-schedule", self.inputs.schedule],
-            check=True)
-        self._results["out_matrix_file"] = self.inputs.out_matrix_file
-        return runtime
-
-
 class _DiffResInputSpec(BaseInterfaceInputSpec):
     data_file = traits.File(mandatory=True, exists=True, desc="Diffusion data file")
 
