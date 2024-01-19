@@ -8,7 +8,7 @@ class SimgCmd:
         else:
             self.command = (f"singularity run -B {config['work_dir']}:{config['work_dir']},"
                         f"{config['output_dir']}:{config['output_dir']},"
-                        f"{config['subject_dir']:{config['subject_dir']}}")
+                        f"{config['subject_dir']}:{config['subject_dir']}")
             self._simg = simg
 
     def cmd(self, command: str, options: Union[str, None] = None) -> str:
