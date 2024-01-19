@@ -1,5 +1,4 @@
 import itertools
-import subprocess
 
 from nipype.interfaces.base import BaseInterfaceInputSpec, TraitedSpec, SimpleInterface, traits
 import nibabel as nib

@@ -1,3 +1,4 @@
+from importlib.resources import files
 from pathlib import Path
 import argparse
 
@@ -12,8 +13,7 @@ from hcpdiffpy.interfaces.preproc import (
 from hcpdiffpy.interfaces.utilities import (
     CreateList, CombineStrings, DiffRes, FlattenList, ListItem, PickDiffFiles, SplitDiffFiles,
     UpdateDiffFiles)
-
-base_dir = Path(__file__).resolve().parent
+import hcpdiffpy import utilities
 
 
 def main() -> None:
@@ -54,8 +54,8 @@ def main() -> None:
     fsl_cmd = SimgCmd(config, config["fsl_simg"])
     fs_cmd = SimgCmd(config, config["fs_simg"])
     wb_cmd = SimgCmd(config, config["wb_simg"])
-    topup_config = Path(base_dir, "utilities", "b02b0.cnf")
-    sch_file = Path(base_dir, "utilities", "bbr.sch")
+    topup_config = Path(files(utilities) / "b02b0.cnf")
+    sch_file = Path(files(utilities) / "bbr.sch")
     fs_dir = Path(config["subject_dir"], "T1w")
 
     # Workflow set-up
@@ -324,7 +324,7 @@ def main() -> None:
             plugin="CondorDAGMan",
             plugin_args={
                 "dagman_args": f"-outfile_dir {config['tmp_dir']} -import_env",
-                "wrapper_cmd": Path(base_dir, "utilities", "venv_wrapper.sh"),
+                "wrapper_cmd": Path(files(utilities) / "venv_wrapper.sh"),
                 "override_specs": "request_memory = 5 GB\nrequest_cpus = 1"})
     else:
         hcpdiff_wf.run()
