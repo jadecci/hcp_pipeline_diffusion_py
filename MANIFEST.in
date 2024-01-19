@@ -1,0 +1,2 @@
+include hcpdiffpy/interfaces/*
+include hcpdiffpy/utilities/*
