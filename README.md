@@ -4,6 +4,12 @@ This is a Python implementation of the Diffusion Preprocessing procedure in
 [HCP Pipeline](https://github.com/Washington-University/HCPpipelines.git). Similar to the original 
 implementation, the input data need to be organised with HCP-like folder structure.
 
+## Installation
+
+```python
+python3 -m pip isntall git+https://github.com/jadecci/hcp_pipeline_diffusion_py.git
+```
+
 ## Prerequisite
 
 The pipeline requires 3 softwares: FSL, FreeSurfer, and Connectome Workbench. To use containerised 
