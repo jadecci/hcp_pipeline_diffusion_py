@@ -50,7 +50,7 @@ class UpdateDiffFiles(SimpleInterface):
         for key in self.inputs.config["keys"]:
             dwi_key = [
                 d_key for d_key in self.inputs.d_files if key in d_key and '.nii.gz' in d_key]
-            dwi_replace = [d_file for d_file in self.inputs.dwi_replacements if key in str(d_file)]
+            dwi_replace = [d_file for d_file in self.inputs.data_files if key in str(d_file)]
             self._results["d_files"][dwi_key[0]] = dwi_replace[0]
         return runtime
 
@@ -85,7 +85,7 @@ class _DiffResInputSpec(BaseInterfaceInputSpec):
 
 
 class _DiffResOutputSpec(TraitedSpec):
-    res = traits.Int(desc="Diffusion data resolution (assuming isotropic)")
+    res = traits.Float(desc="Diffusion data resolution (assuming isotropic)")
     dilate = traits.Int(desc="Dilation range")
 
 
@@ -136,8 +136,8 @@ class CreateList(SimpleInterface):
 class _CombineStringsInputSpec(BaseInterfaceInputSpec):
     input1 = traits.Str(mandatory=True, desc="Input string 1")
     input2 = traits.Str(mandatory=True, desc="Input string 2")
-    input3 = traits.Str("", desc="Input string 3")
-    input4 = traits.Str("", desc="Input string 4")
+    input3 = traits.Str("", usedefault=True, desc="Input string 3")
+    input4 = traits.Str("", usedefault=True, desc="Input string 4")
 
 
 class _StringOutputSpec(TraitedSpec):
