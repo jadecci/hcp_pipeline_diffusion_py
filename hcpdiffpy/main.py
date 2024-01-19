@@ -13,7 +13,7 @@ from hcpdiffpy.interfaces.preproc import (
 from hcpdiffpy.interfaces.utilities import (
     CreateList, CombineStrings, DiffRes, FlattenList, ListItem, PickDiffFiles, SplitDiffFiles,
     UpdateDiffFiles)
-import hcpdiffpy import utilities
+from hcpdiffpy import utilities
 
 
 def main() -> None:
