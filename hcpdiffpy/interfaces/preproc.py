@@ -306,18 +306,17 @@ class EddyPostProc(SimpleInterface):
         pd.DataFrame(corrvols).to_csv(corrvols_file, sep='\t', header=False, index=False)
 
         bval_tsize = bvals.shape[1]
+        roi_file = Path(self.inputs.config["work_dir"], f"{dirs}.nii.gz")
         extract_roi = fsl.ExtractROI(
             command=self.inputs.fsl_cmd.cmd("fslroi"), in_file=self.inputs.eddy_corrected_file,
-            t_size=bval_tsize)
+            t_size=bval_tsize, roi_file=roi_file)
         if dirs == "pos":
             extract_roi.inputs.t_min = 0
         elif dirs == "neg":
             extract_roi.inputs.t_min = bval_tsize
         extract_roi.run()
 
-        return (
-            extract_roi.aggregate_outputs().roi_file, bval_merged, bvec_merged, corrvols_file,
-            bvals, tsizes)
+        return roi_file, bval_merged, bvec_merged, corrvols_file, bvals, tsizes
 
     def _rotate_b(
             self, pos_tsize: list, neg_tsize: list, pos_bvals: pd.DataFrame,
