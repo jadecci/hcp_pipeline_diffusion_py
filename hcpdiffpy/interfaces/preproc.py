@@ -44,7 +44,7 @@ class ExtractB0(SimpleInterface):
 
         for b in bvals:
             roi_file = Path(
-                self.inputs.config["work_dir"],
+                self.inputs.config["tmp_dir"],
                 f"roi{vol_count}_{Path(self.inputs.data_file).name}")
             if b < b0maxbval and b0dist is None:
                 roi = fsl.ExtractROI(
@@ -85,7 +85,7 @@ class ExtractB0(SimpleInterface):
 
 class _RescaleInputSpec(BaseInterfaceInputSpec):
     config = traits.Dict(mandatory=True, desc="Workflow configurations")
-    scale_files = traits.List(mandatory=True, dtype=str, desc="filenames of scale files")
+    scale_files = traits.List(mandatory=True, desc="filenames of scale files")
     d_files = traits.Dict(mandatory=True, dtype=Path, desc="filenames of diffusion data")
     fsl_cmd = traits.Any(mandatory=True, desc="FSL command for using singularity image (or not)")
 
@@ -161,6 +161,32 @@ class PrepareTopup(SimpleInterface):
         return runtime
 
 
+class _BETMaskInputSpec(BaseInterfaceInputSpec):
+    in_file = traits.File(mandatory=True, exists=True, desc="Input file to skull strip")
+    fsl_cmd = traits.Any(mandatory=True, desc="FSL command for using singularity image (or not)")
+    config = traits.Dict(mandatory=True, desc="Workflow configurations")
+
+
+class _BETMaskOutputSpec(TraitedSpec):
+    mask_file = traits.File(exists=True, desc="Binary brain mask file")
+
+
+class BETMask(SimpleInterface):
+    """Run FSL BET to get a mask with subprocess"""
+    input_spec = _BETMaskInputSpec
+    output_spec = _BETMaskOutputSpec
+
+    def _run_interface(self, runtime):
+        out_file = Path(self.inputs.config["tmp_dir"], f"{Path(self.inputs.in_file).stem}.nii.gz")
+        self._results["mask_file"] = Path(
+            self.inputs.config["tmp_dir"], f"{Path(self.inputs.in_file).stem}_mask.nii.gz")
+        subprocess.run(
+            self.inputs.fsl_cmd.cmd("bet").split() + [
+                self.inputs.in_file, out_file, "-f", "0.20", "-m"], check=True)
+
+        return runtime
+
+
 class _MergeBFilesInputSpec(BaseInterfaceInputSpec):
     config = traits.Dict(mandatory=True, desc="Workflow configurations")
     bval_files = traits.List(mandatory=True, dtype=Path, desc="list of bval files to merge")
@@ -189,8 +215,8 @@ class MergeBFiles(SimpleInterface):
             bvecs = pd.concat(
                 [bvecs, pd.read_csv(bvec_file[0], delim_whitespace=True, header=None)], axis=1)
 
-        self._results["bval_merged"] = Path(self.inputs.config["work_dir"], "merged.bval")
-        self._results["bvec_merged"] = Path(self.inputs.config["work_dir"], "merged.bvec")
+        self._results["bval_merged"] = Path(self.inputs.config["tmp_dir"], "merged.bval")
+        self._results["bvec_merged"] = Path(self.inputs.config["tmp_dir"], "merged.bvec")
         bvals.to_csv(self._results["bval_merged"], sep='\t', header=False, index=False)
         bvecs.to_csv(self._results["bvec_merged"], sep='\t', header=False, index=False)
 
@@ -248,7 +274,7 @@ class EddyIndex(SimpleInterface):
                         indices.append(neg_count)
             vol_prev = vol_curr
 
-        self._results["index_file"] = Path(self.inputs.config["work_dir"], "index.txt")
+        self._results["index_file"] = Path(self.inputs.config["tmp_dir"], "index.txt")
         pd.DataFrame(indices).to_csv(
             self._results["index_file"], sep="\t", header=False, index=False)
 
@@ -298,11 +324,11 @@ class EddyPostProc(SimpleInterface):
             corrvols.append([dim4, dim4])
             tsizes.append(bval.shape[1])
 
-        bval_merged = Path(self.inputs.config["work_dir"], f"{dirs}.bval")
+        bval_merged = Path(self.inputs.config["tmp_dir"], f"{dirs}.bval")
         bvals.to_csv(bval_merged, sep='\t', header=False, index=False)
-        bvec_merged = Path(self.inputs.config["work_dir"], f"{dirs}.bvec")
+        bvec_merged = Path(self.inputs.config["tmp_dir"], f"{dirs}.bvec")
         bvecs.to_csv(bvec_merged, sep='\t', header=False, index=False)
-        corrvols_file = Path(self.inputs.config["work_dir"], f"{dirs}_volnum.txt")
+        corrvols_file = Path(self.inputs.config["tmp_dir"], f"{dirs}_volnum.txt")
         pd.DataFrame(corrvols).to_csv(corrvols_file, sep='\t', header=False, index=False)
 
         bval_tsize = bvals.shape[1]
@@ -343,8 +369,8 @@ class EddyPostProc(SimpleInterface):
             avg_bvals[i] = np.rint(eigvals[eigvalmax] ** 0.5)
             avg_bvecs[:, i] = eigvecs[:, eigvalmax]
 
-        self._results["rot_bvals"] = Path(self.inputs.config["work_dir"], "rotated.bval")
-        self._results["rot_bvecs"] = Path(self.inputs.config["work_dir"], "rotated.bvec")
+        self._results["rot_bvals"] = Path(self.inputs.config["tmp_dir"], "rotated.bval")
+        self._results["rot_bvecs"] = Path(self.inputs.config["tmp_dir"], "rotated.bvec")
         pd.DataFrame(avg_bvals).T.to_csv(
             self._results["rot_bvals"], sep=' ', header=False, index=False)
         pd.DataFrame(avg_bvecs).to_csv(
@@ -362,9 +388,9 @@ class EddyPostProc(SimpleInterface):
         subprocess.run(
             self.inputs.fsl_cmd.cmd("eddy_combine").split() + [
                 pos_dwi, pos_bval, pos_bvec, pos_corrvols, neg_dwi, neg_bval, neg_bvec,
-                neg_corrvols, self.inputs.config["work_dir"], "1"],
+                neg_corrvols, self.inputs.config["tmp_dir"], "1"],
             check=True)
-        self._results["combined_dwi_file"] = Path(self.inputs.config["work_dir"], "data.nii.gz")
+        self._results["combined_dwi_file"] = Path(self.inputs.config["tmp_dir"], "data.nii.gz")
         self._rotate_b(pos_tsize, neg_tsize, pos_bvals, neg_bvals)
 
         return runtime
@@ -387,7 +413,7 @@ class WBDilate(SimpleInterface):
     output_spec = _WBDilateOutputSpec
 
     def _run_interface(self, runtime):
-        self._results["out_file"] = Path(self.inputs.config["work_dir"], "data_dilated.nii.gz")
+        self._results["out_file"] = Path(self.inputs.config["tmp_dir"], "data_dilated.nii.gz")
         args = (
             f"-volume-dilate {self.inputs.data_file} {self.inputs.dilate} NEAREST "
             f"{self._results['out_file']}")
@@ -422,7 +448,7 @@ class DilateMask(SimpleInterface):
 
         for _ in range(6):
             resamp_curr = fsl.ImageMaths(
-                command=self.inputs.fsl_cmd.run_cmd("fslmaths"), in_file=mask_prev, args=args)
+                command=self.inputs.fsl_cmd.cmd("fslmaths"), in_file=mask_prev, args=args)
             resamp_curr.run()
             mask_prev = resamp_curr.aggregate_outputs().out_file
         self._results["out_file"] = mask_prev
@@ -448,7 +474,7 @@ class RotateBVec2Str(SimpleInterface):
     def _run_interface(self, runtime):
         bvecs = pd.read_csv(self.inputs.bvecs_file, delim_whitespace=True, header=None)
         rotated_bvecs = np.matmul(np.array(self.inputs.rot)[:3, :3], bvecs)
-        self._results["rotated_file"] = Path(self.inputs.config["work_dir"], "rotated2str.bvec")
+        self._results["rotated_file"] = Path(self.inputs.config["tmp_dir"], "rotated2str.bvec")
         pd.DataFrame(rotated_bvecs).to_csv(
             self._results["rotated_file"], sep=' ', header=False, index=False,
             float_format="%10.6f", quoting=3, escapechar=' ')

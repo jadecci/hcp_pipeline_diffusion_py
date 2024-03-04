@@ -1,16 +1,14 @@
 from pathlib import Path
 from typing import Union
 
-base_dir = Path(__file__).resolve().parent.parent.parent
-
-
 class SimgCmd:
     def __init__(self, config: dict, simg: Union[str, None]) -> None:
         if simg is None:
             self.command = None
         else:
             self.command = (f"singularity run -B {config['work_dir']}:{config['work_dir']},"
-                        f"{config['output_dir']}:{config['output_dir']},{base_dir}:{base_dir}")
+                        f"{config['output_dir']}:{config['output_dir']},"
+                        f"{config['subject_dir']:{config['subject_dir']}}")
             self._simg = simg
 
     def cmd(self, command: str, options: Union[str, None] = None) -> str:

@@ -1,3 +1,4 @@
+from importlib.resources import files
 from pathlib import Path
 import argparse
 
@@ -7,69 +8,65 @@ import nipype.pipeline as pe
 from hcpdiffpy.container import SimgCmd
 from hcpdiffpy.interfaces.data import InitData, SaveData
 from hcpdiffpy.interfaces.preproc import (
-    EddyIndex, EddyPostProc, ExtractB0, DilateMask, MergeBFiles, Rescale, RotateBVec2Str,
+    BETMask, EddyIndex, EddyPostProc, ExtractB0, DilateMask, MergeBFiles, Rescale, RotateBVec2Str,
     PrepareTopup, WBDilate)
 from hcpdiffpy.interfaces.utilities import (
     CreateList, CombineStrings, DiffRes, FlattenList, ListItem, PickDiffFiles, SplitDiffFiles,
     UpdateDiffFiles)
-
-base_dir = Path(__file__).resolve().parent
+from hcpdiffpy import utilities
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="HCP Pipeline for diffusion preprocessing",
         formatter_class=lambda prog: argparse.ArgumentDefaultsHelpFormatter(prog, width=100))
-    parser.add_argument(
+    required = parser.add_argument_group("required arguments")
+    required.add_argument(
         "subject_dir", type=Path,
         help="Absolute path to the subject's data folder (organised in HCP-like structure)")
-    parser.add_argument("subject", type=str, help="Subject ID")
-    parser.add_argument("ndirs", nargs="+", help="List of numbers of directions")
-    parser.add_argument("phases", nargs="+", help="List of 2 phase encoding directions")
-    parser.add_argument("echo_spacing", type=float, help="Echo spacing used for acquisition in ms")
-    parser.add_argument(
-        "--workdir", type=Path, dest="work_dir", default=Path.cwd(),
-        help="Absolute path to work directory")
-    parser.add_argument(
-        "--output_dir", type=Path, dest="output_dir", default=Path.cwd(),
-        help="Absolute path to output directory")
-    parser.add_argument(
-        "--fsl_simg", type=Path, dest="fsl_simg", default=None,
-        help="singularity image to use for command line functions from FSL")
-    parser.add_argument(
-        "--fs_simg", type=Path, dest="fs_simg", default=None,
-        help="singularity image to use for command line functions from FreeSurfer")
-    parser.add_argument(
-        "--wb_simg", type=Path, dest="wb_simg", default=None,
-        help="singularity image to use for command line functions from Connectome Workbench")
-    parser.add_argument(
-        "--condordag", dest="condordag", action="store_true",
-        help="Submit workflow as DAG to HTCondor")
+    required.add_argument("subject", type=str, help="Subject ID")
+    required.add_argument(
+        "echo_spacing", type=float, help="Echo spacing used for acquisition in ms")
+    required.add_argument("--ndirs", required=True, nargs="+", help="List of numbers of directions")
+    required.add_argument(
+        "--phases", required=True, nargs="+", help="List of phase encoding directions")
+    optional = parser.add_argument_group("optional arguments")
+    optional.add_argument(
+        "--work_dir", type=Path, default=Path.cwd(), help="Absolute path to work directory")
+    optional.add_argument(
+        "--output_dir", type=Path, default=Path.cwd(), help="Absolute path to output directory")
+    optional.add_argument("--fsl_simg", type=Path, default=None, help="singularity image for FSL")
+    optional.add_argument(
+        "--fs_simg", type=Path, default=None, help="singularity image for FreeSurfer")
+    optional.add_argument(
+        "--wb_simg", type=Path, default=None, help="singularity image for Connectome Workbench")
+    optional.add_argument("--condordag", action="store_true", help="Submit as DAG to HTCondor")
     config = vars(parser.parse_args())
 
     # Set-up
-    config["tmp_dir"] = Path(config["work_dir"], "hcp_proc_tmp")
+    config["output_dir"].mkdir(parents=True, exist_ok=True)
+    config["tmp_dir"] = Path(config["work_dir"], f"hcpdiff_{config['subject']}_tmp")
     config["tmp_dir"].mkdir(parents=True, exist_ok=True)
     config["keys"] = [
         f"dir{ndir}_{phase}" for ndir in sorted(config["ndirs"])
         for phase in sorted(config["phases"])]
-    d_iterables = [("ndir", config["ndirs"]), ("phases", config["phases"])]
+    d_iterables = [("ndir", config["ndirs"]), ("phase", config["phases"])]
     fsl_cmd = SimgCmd(config, config["fsl_simg"])
     fs_cmd = SimgCmd(config, config["fs_simg"])
     wb_cmd = SimgCmd(config, config["wb_simg"])
-    topup_config = Path(base_dir, "utilities", "b02b0.cnf")
-    sch_file = Path(base_dir, "utilities", "bbr.sch")
-    fs_dir = Path(config["subject_dir"], "T1w", config["subject"])
+    topup_config = Path(files(utilities) / "b02b0.cnf")
+    sch_file = Path(files(utilities) / "bbr.sch")
+    fs_dir = Path(config["subject_dir"], "T1w")
 
     # Workflow set-up
     hcpdiff_wf = pe.Workflow(f"hcpdiff_{config['subject']}_wf", base_dir=config["work_dir"])
-    hcpdiff_wf.config["execution"]["try_hard_link_datasink"] = "false"
+    hcpdiff_wf.config["execution"]["remove_node_directories"] = "true"
     hcpdiff_wf.config["execution"]["crashfile_format"] = "txt"
     hcpdiff_wf.config["execution"]["stop_on_first_crash"] = "true"
 
     # Get data
     init_data = pe.Node(InitData(config=config), "init_data")
-    d_files = pe.Node(PickDiffFiles(), "split_diff_files", ietrables=d_iterables)
+    d_files = pe.Node(PickDiffFiles(), "d_files", iterables=d_iterables)
 
     hcpdiff_wf.connect([(init_data, d_files, [("d_files", "d_files")])])
 
@@ -83,7 +80,7 @@ def main() -> None:
     scale = pe.Node(fsl.ImageMeants(command=fsl_cmd.cmd("fslmeants")), "scale")
     rescale = pe.JoinNode(
         Rescale(fsl_cmd=fsl_cmd, config=config), "rescale",
-        joinfield=["scale_files"], joinsource="split_diff_files")
+        joinfield=["scale_files"], joinsource="d_files")
 
     hcpdiff_wf.connect([
         (d_files, mean_dwi, [("data_file", "in_file")]),
@@ -93,7 +90,7 @@ def main() -> None:
         (merge_b0s, mean_b0, [("merged_file", "in_file")]),
         (mean_b0, scale, [("out_file", "in_file")]),
         (init_data, rescale, [("d_files", "d_files")]),
-        (scale, rescale, [("out_file", "scale_file")])])
+        (scale, rescale, [("out_file", "scale_files")])])
 
     # 1.2. Prepare b0s and index files for topup
     update_d_files = pe.Node(UpdateDiffFiles(config=config), "update_d_files")
@@ -131,7 +128,7 @@ def main() -> None:
     b01_files = pe.Node(CreateList(), "b01_files")
     apply_topup = pe.Node(
         fsl.ApplyTOPUP(command=fsl_cmd.cmd("applytopup"), method="jac"), "apply_topup")
-    nodiff_mask = pe.Node(fsl.BET(command=fsl_cmd.cmd("bet"), frac=0.2, mask=True), "nodiff_mask")
+    nodiff_mask = pe.Node(BETMask(config=config, fsl_cmd=fsl_cmd), "nodiff_mask")
 
     hcpdiff_wf.connect([
         (update_d_files, prepare_topup, [("d_files", "d_files")]),
@@ -178,18 +175,20 @@ def main() -> None:
     fov_mask = pe.Node(
         fsl.ImageMaths(command=fsl_cmd.cmd("fslmaths"), args="-abs -Tmin -bin -fillh"), "fov_mask")
     mask_args = pe.Node(CombineStrings(input1="-mas "), "mask_args")
-    mask_data = pe.Node(fsl.ImageMaths(command=fsl_cmd.cmd("fslmaths")), "mask_data")
+    fmask_data = pe.Node(fsl.ImageMaths(command=fsl_cmd.cmd("fslmaths")), "fmask_data")
     thr_data = pe.Node(fsl.ImageMaths(command=fsl_cmd.cmd("fslmaths"), args="-thr 0"), "thr_data")
 
     hcpdiff_wf.connect([
         (d_filetype, postproc, [
             ("bval_files", "bval_files"), ("bvec_files", "bvec_files"),
             ("data_files", "rescaled_files")]),
+        (eddy, postproc, [
+            ("out_corrected", "eddy_corrected_file"), ("out_rotated_bvecs", "eddy_bvecs_file")]),
         (postproc, fov_mask, [("combined_dwi_file", "in_file")]),
         (fov_mask, mask_args, [("out_file", "input2")]),
-        (postproc, mask_data, [("combined_dwi_file", "in_file")]),
-        (mask_args, mask_data, [("output", "args")]),
-        (mask_data, thr_data, [("out_file", "in_file")])])
+        (postproc, fmask_data, [("combined_dwi_file", "in_file")]),
+        (mask_args, fmask_data, [("output", "args")]),
+        (fmask_data, thr_data, [("out_file", "in_file")])])
 
     # 3.2. DiffusionToStructural
     # 3.2.1. nodiff-to-T1
@@ -234,7 +233,8 @@ def main() -> None:
             subject_id=config["subject"]),
         "bbr_epi2t1")
     tkr_diff2str = pe.Node(
-        freesurfer.Tkregister2(command=fs_cmd.cmd("tkregister2"), noedit=True), "tkr_diff2str")
+        freesurfer.Tkregister2(command=fs_cmd.cmd("tkregister2"), noedit=True, fsl_out=True),
+        "tkr_diff2str")
     diff2str = pe.Node(
         fsl.ConvertXFM(command=fsl_cmd.cmd("convert_xfm"), concat_xfm=True), "diff2str")
 
@@ -282,8 +282,8 @@ def main() -> None:
     dilate_mask = pe.Node(DilateMask(fsl_cmd=fsl_cmd), "dilate_mask")
     thr_fmask = pe.Node(
         fsl.ImageMaths(command=fsl_cmd.cmd("fslmaths"), args="-thr 0.999 -bin"), "thr_fmask")
-    masks_args = pe.Node(CombineStrings(input1="-mas ", input3="-mas "), "masks_args")
-    mask_data = pe.Node(fsl.ImageMaths(command=fsl_cmd.cmd("fslmaths")), "fmask_data")
+    masks_args = pe.Node(CombineStrings(input1="-mas ", input3=" -mas "), "masks_args")
+    mask_data = pe.Node(fsl.ImageMaths(command=fsl_cmd.cmd("fslmaths")), "mask_data")
     nonneg_data = pe.Node(
         fsl.ImageMaths(command=fsl_cmd.cmd("fslmaths"), args="-thr 0"), "nonneg_data")
     mean_mask = pe.Node(fsl.ImageMaths(command=fsl_cmd.cmd("fslmaths"), args="-Tmean"), "mean_mask")
@@ -323,8 +323,8 @@ def main() -> None:
         hcpdiff_wf.run(
             plugin="CondorDAGMan",
             plugin_args={
-                "dagman_args": f"-outfile_dir {config['work_dir']} -import_env",
-                "wrapper_cmd": Path(base_dir, "utilities", "venv_wrapper.sh"),
+                "dagman_args": f"-outfile_dir {config['tmp_dir']} -import_env",
+                "wrapper_cmd": Path(files(utilities) / "venv_wrapper.sh"),
                 "override_specs": "request_memory = 5 GB\nrequest_cpus = 1"})
     else:
         hcpdiff_wf.run()

@@ -34,12 +34,13 @@ class InitData(SimpleInterface):
             for phase in self.inputs.config["phases"]:
                 for file_type in [".nii.gz", ".bval", ".bvec"]:
                     key = f"dir{ndir}_{phase}{file_type}"
-                    self._results["d_files"][key] = Path(d_dir, f"{self.inputs.subject}_dMRI_{key}")
+                    self._results["d_files"][key] = Path(
+                        d_dir, f"{self.inputs.config['subject']}_dMRI_{key}")
 
         anat_dir = Path(sub_dir, "T1w")
         self._results["t1_file"] = Path(anat_dir, 'T1w_acpc_dc.nii.gz')
         self._results["t1_restore_file"] = Path(anat_dir, 'T1w_acpc_dc_restore.nii.gz')
-        self._results["t1_restore_brain"] = Path(anat_dir, 'T1w_acpc_dc_restore_brain.nii.gz')
+        self._results["t1_brain_file"] = Path(anat_dir, 'T1w_acpc_dc_restore_brain.nii.gz')
         self._results["bias_file"] = Path(anat_dir, 'BiasField_acpc_dc.nii.gz')
         self._results["mask_file"] = Path(anat_dir, 'brainmask_fs.nii.gz')
 
@@ -63,7 +64,6 @@ class SaveData(SimpleInterface):
 
     def _run_interface(self, runtime):
         out_dir = self.inputs.config["output_dir"]
-        out_dir.mkdir(parents=True, exist_ok=True)
         copyfile(self.inputs.data_file, Path(out_dir, "data.nii.gz"))
         copyfile(self.inputs.bval_file, Path(out_dir, "bvals"))
         copyfile(self.inputs.bvec_file, Path(out_dir, "bvecs"))
