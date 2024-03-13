@@ -332,7 +332,7 @@ class EddyPostProc(SimpleInterface):
         pd.DataFrame(corrvols).to_csv(corrvols_file, sep='\t', header=False, index=False)
 
         bval_tsize = bvals.shape[1]
-        roi_file = Path(self.inputs.config["work_dir"], f"{dirs}.nii.gz")
+        roi_file = Path(self.inputs.config["tmp_dir"], f"{dirs}.nii.gz")
         extract_roi = fsl.ExtractROI(
             command=self.inputs.fsl_cmd.cmd("fslroi"), in_file=self.inputs.eddy_corrected_file,
             t_size=bval_tsize, roi_file=roi_file)
