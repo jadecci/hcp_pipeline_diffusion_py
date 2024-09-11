@@ -36,9 +36,9 @@ positional arguments:
 
 options:
   -h, --help            show this help message and exit
-  --workdir WORK_DIR    Absolute path to work directory (default: /data/project/hcpa_dwi_proc)
+  --workdir WORK_DIR    Absolute path to work directory (default: current working directory)
   --output_dir OUTPUT_DIR
-                        Absolute path to output directory (default: /data/project/hcpa_dwi_proc)
+                        Absolute path to output directory (default: current working directory)
   --fsl_simg FSL_SIMG   singularity image to use for command line functions from FSL (default: None)
   --fs_simg FS_SIMG     singularity image to use for command line functions from FreeSurfer
                         (default: None)
